@@ -1,0 +1,55 @@
+# ==========================================
+# ステージ 1: ビルド環境 (devel)
+# ==========================================
+FROM nvidia/cuda:12.1.0-devel-ubuntu22.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ビルドに必要なシステムツールと Python のインストール
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip python3-dev git build-essential ninja-build \
+    && rm -rf /var/lib/apt/lists/*
+
+# pipの更新と PyTorch 2.11.0、および周辺ライブラリのインストール
+RUN pip3 install --no-cache-dir --upgrade pip && \
+    pip3 install --no-cache-dir \
+    torch==2.11.0 torchvision torchaudio \
+    --index-url https://download.pytorch.org/whl/cu121
+
+# --- MMCV のソースビルド処理 ---
+# RTX 5090のBlackwell (sm_100) または環境がサポートする最大構成をターゲットに指定してビルド
+# (※ビルドエラーを防ぐため、並列数を調整する MAX_JOBS を指定することをお勧めします)
+ENV FORCE_CUDA="1"
+ENV MMCV_WITH_OPS=1
+ENV MAX_JOBS=4 
+
+WORKDIR /src
+RUN git clone https://github.com && \
+    cd mmcv && \
+    # 必要に応じて特定のタグをチェックアウト (例: v2.2.0)
+    git checkout v2.2.0 && \
+    pip3 install -r requirements/optional.txt && \
+    # `-e .` (editable) ではなく、通常の install を行うことで完全に配置させる
+    python3 setup.py install
+
+
+# ==========================================
+# ステージ 2: 実行環境 (runtime) ← ここでイメージを軽量化
+# ==========================================
+FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 実行時に最低限必要なランタイムツールのみをインストール
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# ステージ1 (builder) から、PyTorchとMMCVがインストールされたPythonパッケージ群を丸ごとコピー
+# (Ubuntu22.04のデフォルトPython3.10環境を想定)
+COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
+
+# コピーしたパッケージを認識させるためのパス設定
+ENV PYTHONPATH="/usr/local/lib/python3.10/dist-packages:\$PYTHONPATH"
+
+WORKDIR /workspace
