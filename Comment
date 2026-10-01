@@ -1,0 +1,44 @@
+RTX 5090（Blackwell世代）で自作ビルドした MMCV を動かすために、マルチステージビルドを使って最終イメージを軽量化（ランタイム化）するDockerfileの設計方法です。
+RTX 5090でMMCVをビルドする場合、Blackwellの演算能力（Compute Capability 10.0、または暫定のアーキテクチャフラグ）をターゲットにして 
+devel でコンパイルし、生成された成果物だけを runtime にコピーする必要があります。
+また、ご提示の PyTorch 2.11.0（※表記の「12.11.0」はリリースタイミングから「PyTorch 2.11.0」の誤記として対応します）と
+MMCVを綺麗にruntimeへ移行させるための、実用的なDockerfileテンプレートを作成しました。
+
+軽量化のための設計ポイント
+1. MMCVとPyTorchの移行パス:
+MMCVは、自身（mmcv）のPythonコードの中に、ビルドされたC++/CUDA拡張（.so ファイル）が含まれています。そのため、devel 側でインストールされたPythonの site-packages（または dist-packages）を、丸ごと runtime 側にコピーするのが最も安全で確実です。
+2. baseではなくruntimeを選ぶ理由:
+MMCVのGPU機能は、CUDAの動的ライブラリ（libcudart.so や libcublas.so など）に依存しています。base イメージではこれらが不足しており起動時にエラーになるため、最終ステージには runtime イメージを使用します。
+
+一時的にtarをイメージとしてロードする（マルチステージを維持する形）
+もし手元にあるtarファイルが、docker save コマンドでエクスポートした「Dockerイメージ全体のtarファイル（例: builder_image.tar）」である場合は、一度Dockerにイメージとして読み込ませることで、これまでのマルチステージビルドと同じ構文が使えます。
+1. 事前準備（ホスト側で実行）
+まず、手元にあるtarファイルをDockerイメージとしてローカル環境にロード（復元）します。
+bash
+docker load -i builder_image.tar
+
+# python3 -c "import torch; import mmcv; print('Torch パス:', torch.__file__); print('MMCV パス:', mmcv.__file__)"
+Torch パス: /usr/local/lib/python3.10/dist-packages/torch/__init__.py
+MMCV パス: /usr/local/lib/python3.10/dist-packages/mmcv/__init__.py
+
+
+2. ステージ2の Dockerfile の書き方
+Dockerfileの FROM に、先ほどロードしたイメージ名を指定してマルチステージビルドを行います。
+
+# 1. ロードしたステージ1のイメージを暫定のエイリアス（old_builder）にする
+FROM my-builder-image:latest AS old_builder
+
+# 2. 最終的な runtime イメージの作成
+FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# ロードしたイメージ（old_builder）からパッケージをコピー
+COPY --from=old_builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
+
+ENV PYTHONPATH="/usr/local/lib/python3.10/dist-packages:$PYTHONPATH"
+WORKDIR /workspace
