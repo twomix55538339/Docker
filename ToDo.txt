@@ -1,0 +1,26 @@
+◆RTX5090のチェックはいらない。RTF5090ではないPCでImageをビルドする可能性があるから
+
+◆Dockerfile名の工夫：Dockerfile_GPU_RTX5090
+
+◆Dockerfile先頭の変数を削除してはいけない。どこに利用されているか確認、もしかたらCI/CDのため？
+
+◆--no-install-recommendsの有無確認
+
+◆docker build --pull --no-cache -t MyImage .の「--no-cache」の有無確認
+（目的：確実に「ベースイメージも、その上でインストールするパッケージもすべて最新」にしたい場合は、
+　--no-cache も併用するのがCI/CD環境などでの鉄則です。）
+
+◆CI/CDに影響を及ぼない？
+
+# ビルドに必要なシステムツールと Python のインストール
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip python3-dev git build-essential ninja-build \
+    && rm -rf /var/lib/apt/lists/*
+
+
+◆--no-cache-dirの有無閣員
+# pipの更新と PyTorch 2.11.0、および周辺ライブラリのインストール
+RUN pip3 install --no-cache-dir --upgrade pip && \
+    pip3 install --no-cache-dir \
+    torch==2.11.0 torchvision torchaudio \
+    --index-url https://download.pytorch.org/whl/cu121
