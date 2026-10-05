@@ -114,7 +114,7 @@ USE_OPENMP=ON, USE_ROCM=OFF, USE_ROCM_KERNEL_ASSERT=OFF, \n'),
 
 コンテナ内で配布済み wheel（公式の事前ビルド済みバイナリ）から導入されたか、それともローカルでソースからビルド（自前ビルド）されたかを判別するには、パッケージのメタデータ（direct_url.json / WHEEL） または 内部のビルド環境情報 を確認します。
 
-方法1: メタデータ（direct_url.json）の有無を確認する【最も簡単・確実】
+### 方法1: メタデータ（direct_url.json）の有無を確認する【最も簡単・確実】
 ソースコード（Gitリポジトリやローカルディレクトリ）から pip install . や pip install -e .、python setup.py install 等で自前ビルドした場合、インストール先ディレクトリに direct_url.json という追跡ファイルが生成されます。公式の .whl を直接または -f 経由で入れた場合は通常存在しません。
 
 Docker Desktop の Exec 画面で以下を実行します：
@@ -206,7 +206,7 @@ MMCV compiler          : GCC 11.4
 
 mim install "mmcv==2.2.0" を実行した際、mim（OpenMMLab Install Manager）は内部で以下の流れ・参照先から wheel を探してダウンロードします。
 
-1. どこからダウンロードするのか？
+### 方法 1: どこからダウンロードするのか？
    mim は、環境内の PyTorch バージョン と CUDA バージョン を自動検出し、OpenMMLab の公式配信サーバー（AWS S3 ベースの CDN）にある 専用インデックス URL を自動構築して参照します。
 
 ベース URL:
@@ -227,14 +227,14 @@ https://download.openmmlab.com/mmcv/dist/cu121/torch2.3/index.html
 pip install mmcv==2.2.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.3/index.html
 ```
 
-### 2. もし見つからなかった場合のフォールバック（注意点）
+### 方法 2: もし見つからなかった場合のフォールバック（注意点）
 
 もし上記 URL に一致する事前ビルド済み wheel が存在しない場合（例: マイナーバージョンの不一致や未対応の組み合わせ）、`mim` は通常の **PyPI（pypi.org）** から mmcv のソースコード（`.tar.gz`）を取得しようとします。
 
 * その場合、コンテナ内で C++/CUDA のコンパイル（自前ビルド）が始まります。
 * 必要なコンパイラ（`g++` や `nvcc`）がコンテナに揃っていないと、ビルドエラーで停止します。
 
-### 3. `mim` が参照している URL を確認するコマンド
+### 方法 3: `mim` が参照している URL を確認するコマンド
 
 コンテナ内で `mim` がどの URL を解決しているかは、`--verbose` オプションを付けて実行することでログから直接確認できます。
 
