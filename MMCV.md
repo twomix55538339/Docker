@@ -19,7 +19,7 @@
 # RUN pip install "https://download.openmmlab.com/mmcv/dist/cu121/torch2.3.0/mmcv-2.2.0-cp310-cp310-manylinux1_x86_64.whl"
 # RUN mim install "mmdet==3.2.0"
 # RUN mim install "mmpose==1.3.1"
-# 上記のコマンドはOK。"mmdet==3.2.0"と"mmpose==1.3.1"の後で、自前ビルドが走ることがない
+# 上記のコマンドもNG。同じの原因で、mmcv==2.2.0のWheelを先にダウンロード済みになっても、mmdet 3.2.0を行った後、すぐにのmmcv3.1.0のソースをダウンロードして自前ビルドが走る
 
 RUN mim install "mmcv==2.2.0"
 RUN mim install "mmdet==3.2.0" --no-deps
